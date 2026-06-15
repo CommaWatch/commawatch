@@ -1,0 +1,509 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CommaWatch · Live</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --obsidian:#0A0E0C; --surface:#0F1512; --surface-2:#131A16;
+    --hair:rgba(244,239,230,.10); --hair-2:rgba(244,239,230,.06);
+    --brass:#E8B84B; --brass-dim:rgba(232,184,75,.16);
+    --paper:#F4EFE6; --muted:#8B9B90;
+    --gain:#36D399; --loss:#FF6B6B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--obsidian);color:var(--paper);font-family:'Inter',system-ui,sans-serif;padding:22px 18px 70px;-webkit-text-size-adjust:100%}
+  .wrap{max-width:760px;margin:0 auto}
+  .cm{color:var(--brass)}
+
+  .bar{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .logo{width:42px;height:42px;border-radius:11px;background:linear-gradient(160deg,#1a2620,#0c120f);border:1px solid var(--brass-dim);display:grid;place-items:center;flex:0 0 auto}
+  .logo b{font-family:'Archivo';font-weight:900;color:var(--brass);font-size:40px;line-height:0;margin-top:11px}
+  .wm{font-family:'Archivo';font-weight:800;letter-spacing:.13em;font-size:18px}
+  .wm .c{color:var(--brass)}
+  .mkt{margin-left:auto;display:flex;align-items:center;gap:9px;font-family:'JetBrains Mono';font-size:12px;letter-spacing:.06em;color:var(--muted)}
+  .mkt .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+  .mkt.open .dot{background:var(--gain);animation:pulse 2.4s infinite}
+  .mkt.open .lbl{color:var(--gain)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(54,211,153,.5)}70%{box-shadow:0 0 0 7px rgba(54,211,153,0)}100%{box-shadow:0 0 0 0 rgba(54,211,153,0)}}
+
+  .search{position:relative;margin-bottom:24px}
+  .search input{width:100%;background:var(--surface);border:1px solid var(--hair);border-radius:13px;color:var(--paper);font-size:15px;font-family:'Inter';padding:14px 16px 14px 44px;outline:none}
+  .search input:focus{border-color:var(--brass-dim)}
+  .search::before{content:"⌕";position:absolute;left:15px;top:11px;font-size:20px;color:var(--muted)}
+  .results{position:absolute;top:54px;left:0;right:0;background:var(--surface-2);border:1px solid var(--hair);border-radius:13px;overflow:hidden;z-index:30;display:none;box-shadow:0 20px 50px -20px rgba(0,0,0,.8)}
+  .results.show{display:block}
+  .res{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-bottom:1px solid var(--hair-2)}
+  .res:last-child{border-bottom:0}
+  .res:hover,.res.active{background:rgba(232,184,75,.07)}
+  .res .tk{font-family:'JetBrains Mono';font-weight:700;font-size:12px;color:var(--brass);width:78px}
+  .res .nm{font-weight:600;font-size:14px}
+  .res .co{color:var(--muted);font-size:12px;margin-left:auto;font-family:'JetBrains Mono'}
+
+  .phead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .pname{font-family:'Archivo';font-weight:800;font-size:26px;letter-spacing:.01em}
+  .ptk{font-family:'JetBrains Mono';font-weight:700;font-size:13px;color:var(--brass);border:1px solid var(--brass-dim);border-radius:7px;padding:3px 8px}
+  .pco{color:var(--muted);font-size:13px;font-family:'JetBrains Mono'}
+  .nw{font-family:'JetBrains Mono';font-weight:800;font-size:46px;letter-spacing:-.02em;margin-top:14px;transition:color .25s}
+  .nw.flash-up{color:var(--gain)} .nw.flash-down{color:var(--loss)}
+  .club{font-family:'JetBrains Mono';font-weight:700;font-size:11px;letter-spacing:.1em;color:var(--obsidian);background:linear-gradient(90deg,#E8B84B,#f3d486);border-radius:999px;padding:5px 11px;display:inline-flex;gap:5px;align-items:center;box-shadow:0 0 0 0 rgba(232,184,75,.5);animation:glow 2.8s infinite}
+  @keyframes glow{0%{box-shadow:0 0 0 0 rgba(232,184,75,.5)}70%{box-shadow:0 0 0 10px rgba(232,184,75,0)}100%{box-shadow:0 0 0 0 rgba(232,184,75,0)}}
+  .chg{margin-top:7px;font-family:'JetBrains Mono';font-weight:700;font-size:16px;display:flex;align-items:center;gap:9px}
+  .chg .amt.up,.chg .pc.up{color:var(--gain)} .chg .amt.down,.chg .pc.down{color:var(--loss)}
+  .chg .when{color:var(--muted);font-weight:500;font-size:13px}
+
+  .chartwrap{margin-top:18px;position:relative}
+  canvas{width:100%;height:200px;display:block;cursor:crosshair;touch-action:pan-y}
+  .ranges{display:flex;gap:6px;margin-top:10px}
+  .range{font-family:'JetBrains Mono';font-size:12px;letter-spacing:.05em;color:var(--muted);background:none;border:1px solid var(--hair);border-radius:8px;padding:6px 12px;cursor:pointer}
+  .range.active{color:var(--obsidian);background:var(--brass);border-color:var(--brass);font-weight:700}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:16px 17px}
+  .panel.full{grid-column:1/-1}
+  .ph{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:13px}
+  .row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--hair-2);font-size:14px}
+  .row:last-child{border-bottom:0}
+  .row .k{color:var(--muted)}
+  .row .v{font-family:'JetBrains Mono';font-weight:700}
+  .v.up{color:var(--gain)} .v.down{color:var(--loss)}
+  .stars{color:var(--brass);letter-spacing:2px} .stars .off{color:rgba(232,184,75,.25)}
+  .cov{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.1em;color:var(--muted);border:1px solid var(--hair);border-radius:6px;padding:3px 7px}
+  .priv{color:var(--muted);font-size:11.5px;margin-top:10px;line-height:1.55}
+
+  .hold{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--hair-2);gap:12px}
+  .hold:last-child{border-bottom:0}
+  .hold .ht{font-family:'JetBrains Mono';font-weight:700;font-size:13px}
+  .hold .hs{color:var(--muted);font-size:11.5px;margin-top:2px}
+  .hold .hv{font-family:'JetBrains Mono';font-weight:700;font-size:14px;text-align:right;white-space:nowrap}
+  .hbadge{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.06em;color:var(--brass);border:1px solid var(--brass-dim);border-radius:5px;padding:2px 5px;margin-left:7px}
+  .hbadge.est{color:var(--muted);border-color:var(--hair)}
+  .holdtot{display:flex;align-items:center;justify-content:space-between;padding-top:12px;margin-top:4px;border-top:1px solid var(--hair);font-size:13px}
+  .holdtot .k{color:var(--muted);font-family:'JetBrains Mono';letter-spacing:.08em;text-transform:uppercase;font-size:11px}
+  .holdtot .v{font-family:'JetBrains Mono';font-weight:800;font-size:16px}
+
+  .eod{background:linear-gradient(180deg,#15180e,#0d100a);border:1px solid var(--brass-dim)}
+  .eod .ph{color:var(--brass)}
+  .eodgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px}
+  .eodcell .ek{color:var(--muted);font-size:11px;letter-spacing:.06em;text-transform:uppercase;font-family:'JetBrains Mono'}
+  .eodcell .ev{font-family:'JetBrains Mono';font-weight:800;font-size:18px;margin-top:3px}
+  .ev.up{color:var(--gain)} .ev.down{color:var(--loss)}
+
+  .ctl{display:flex;align-items:center;gap:10px;margin-top:26px;color:var(--muted);font-size:13px;flex-wrap:wrap}
+  .toggle{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none;background:var(--surface);border:1px solid var(--hair);border-radius:999px;padding:7px 13px}
+  .toggle .sw{width:34px;height:18px;border-radius:999px;background:var(--hair);position:relative;transition:.2s}
+  .toggle .sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--muted);transition:.2s}
+  .toggle.on .sw{background:var(--brass-dim)} .toggle.on .sw::after{left:18px;background:var(--brass)}
+  .note{margin-top:16px;color:var(--muted);font-size:12.5px;line-height:1.6;border-top:1px solid var(--hair);padding-top:16px}
+  .note b{color:var(--paper);font-weight:600}
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <div class="logo"><svg viewBox="0 0 100 100" width="26" height="26" aria-label="CommaWatch"><circle cx="52" cy="43" r="23" fill="#E8B84B"/><path d="M37 58 Q31 80 41 88 Q44 90 47 86 Q57 72 62 55 Z" fill="#E8B84B"/></svg></div>
+    <div class="wm">COMMA<span class="c">,</span>WATCH</div>
+    <div class="mkt" id="mkt"><span class="dot"></span><span class="lbl" id="mktlbl">—</span></div>
+  </div>
+
+  <div class="search">
+    <input id="q" placeholder="Search a name…  (try Ellison, Musk, Bezos, Ballmer)" autocomplete="off">
+    <div class="results" id="results"></div>
+  </div>
+
+  <div id="profile"></div>
+
+  <div class="ctl">
+    <div class="toggle" id="simtoggle"><span class="sw"></span><span>Demo mode</span></div>
+    <span>— simulate movement when the market's closed or before live data is connected.</span>
+  </div>
+
+  <div class="note">
+    <b>How the data works.</b> When this page is deployed with the price fetcher connected, the LIVE holdings pull
+    <b>real market prices</b> and net worth = Σ(shares × real price) + private assets. With no connection (opened
+    locally, or before setup), it falls back to a built-in simulator so it never looks broken — flip Demo mode to watch
+    it move. Private holdings (Blue Origin, the Clippers, real estate) are <b>labeled estimates from public records</b>,
+    not live. Share counts and private valuations still need final confirmation before publishing.
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // base prices per ticker (demo, ~June 2026 plausible levels)
+  var PRICES = { ORCL:185, TSLA:425, META:660, NVDA:205, MSFT:420, "BRK.B":490, AMZN:250, SPCX:150 };
+
+  // roster with full holdings — live (public, ticks) + static (private, est.)
+  var ROSTER = [
+    {id:"ellison", name:"Larry Ellison", co:"Oracle", tk:"ORCL · TSLA", conf:4,
+     note:"Also holds a Paramount Skydance (PSKY) stake; ~⅓ of his Oracle shares are pledged as loan collateral.",
+     holdings:[
+       {label:"Oracle", ticker:"ORCL", shares:1.16e9, kind:"live"},
+       {label:"Tesla", ticker:"TSLA", shares:45e6, kind:"live"},
+       {label:"Real estate — Lanai island + estates", value:4e9, kind:"realestate", src:"Est. from public records"},
+       {label:"Sports & media — Indian Wells, SailGP", value:2e9, kind:"sports", src:"Estimate"}
+     ]},
+    {id:"bezos", name:"Jeff Bezos", co:"Amazon", tk:"AMZN", conf:4,
+     note:"Non-Amazon assets are private estimates; Blue Origin has no market price, so its value is an analyst range.",
+     holdings:[
+       {label:"Amazon", ticker:"AMZN", shares:8.83e8, kind:"live"},
+       {label:"Blue Origin", value:50e9, kind:"private", src:"Private — analyst est. $50–100B"},
+       {label:"The Washington Post", value:1.4e9, kind:"private", src:"via Nash Holdings"},
+       {label:"Ventures, real estate & Koru yacht", value:4e9, kind:"private", src:"Bezos Expeditions, est."}
+     ]},
+    {id:"zuck", name:"Mark Zuckerberg", co:"Meta", tk:"META", conf:5,
+     note:"~95% of his fortune is Meta; controls ~61% of voting power via Class B shares.",
+     holdings:[
+       {label:"Meta Platforms", ticker:"META", shares:3.45e8, kind:"live"},
+       {label:"Real estate — Kauai, Palo Alto, Miami", value:0.5e9, kind:"realestate", src:"Est. ~$450–500M"},
+       {label:"Launchpad superyacht", value:0.3e9, kind:"private", src:"Estimate"}
+     ]},
+    {id:"musk", name:"Elon Musk", co:"Tesla · SpaceX", tk:"TSLA · SPCX", conf:4,
+     note:"SpaceX/xAI/X went public as SPCX on Jun 12, 2026, repricing his stake past $1T. Net worth includes his vested in-the-money options (Tesla 2018 award + SPCX), counted the way Forbes and Bloomberg do.",
+     holdings:[
+       {label:"Tesla — common shares", ticker:"TSLA", shares:4.10e8, kind:"live"},
+       {label:"Tesla — 2018 award options", ticker:"TSLA", shares:3.03e8, strike:23.34, kind:"live"},
+       {label:"SpaceX · xAI · X", ticker:"SPCX", shares:4.77e9, kind:"live"},
+       {label:"SpaceX — vested options", ticker:"SPCX", shares:3.5e8, strike:8.40, kind:"live"},
+       {label:"Neuralink", value:9e9, kind:"private", src:"~majority, $9B Series E"},
+       {label:"The Boring Company", value:5.7e9, kind:"private", src:"~90%, $5.7B"}
+     ]},
+    {id:"ballmer", name:"Steve Ballmer", co:"Microsoft", tk:"MSFT", conf:4,
+     note:"Microsoft share count is from his last required disclosure in 2014, assumed unchanged since.",
+     holdings:[
+       {label:"Microsoft", ticker:"MSFT", shares:3.33e8, kind:"live"},
+       {label:"LA Clippers", value:6.72e9, kind:"sports", src:"Sportico, Oct 2025"},
+       {label:"Intuit Dome arena", value:2e9, kind:"private", src:"~construction cost"},
+       {label:"The Forum + cash & investments", value:3.9e9, kind:"cash", src:"Est. (incl. $400M Forum)"}
+     ]},
+    {id:"huang", name:"Jensen Huang", co:"NVIDIA", tk:"NVDA", conf:5,
+     note:"~3.6% of Nvidia; the remainder of his fortune is diversified investments not itemized here.",
+     holdings:[
+       {label:"NVIDIA", ticker:"NVDA", shares:8.80e8, kind:"live"}
+     ]},
+    {id:"buffett", name:"Warren Buffett", co:"Berkshire", tk:"BRK.B", conf:5,
+     note:"Holds mostly Class A (converted here to B-equivalent); donates large blocks to charity each year.",
+     holdings:[
+       {label:"Berkshire Hathaway", ticker:"BRK.B", shares:2.85e8, kind:"live"}
+     ]}
+  ];
+
+  var $=function(s){return document.querySelector(s);};
+  var selected=null, sim=null, forceLive=false, range="1D", hoverIdx=null, currentSeries=null, realData=false, realSeeded=false;
+
+  // ---------- helpers ----------
+  function liveH(p){return p.holdings.filter(function(h){return h.kind==="live";});}
+  function staticTotal(p){return p.holdings.filter(function(h){return h.kind!=="live";}).reduce(function(s,h){return s+(h.value||0);},0);}
+  function holdVal(h,price){return h.strike!=null?Math.max(0,(price-h.strike))*h.shares:h.shares*price;}
+  function nwAt(p,pick){var s=staticTotal(p);liveH(p).forEach(function(h){s+=holdVal(h,pick(h.ticker));});return s;}
+  function nwNow(p){return nwAt(p,function(t){return sim.prices[t].last;});}
+  function nwPrev(p){return nwAt(p,function(t){return sim.prices[t].prevClose;});}
+  function cssId(t){return t.replace(/\./g,'-');}
+
+  function withCommas(n){return Math.round(n).toLocaleString('en-US').replace(/,/g,'<span class="cm">,</span>');}
+  function money(n){var a=Math.abs(n),sg=n<0?"-":"";
+    if(a>=1e12)return sg+"$"+(a/1e12).toFixed(2)+"T";
+    if(a>=1e9)return sg+"$"+(a/1e9).toFixed(2)+"B";
+    if(a>=1e6)return sg+"$"+(a/1e6).toFixed(1)+"M";
+    return sg+"$"+Math.round(a).toLocaleString('en-US');}
+  function starHTML(n){var s="";for(var i=1;i<=5;i++)s+= i<=n?"★":'<span class="off">★</span>';return s;}
+  function confWord(n){return {5:"Very high",4:"High",3:"Moderate",2:"Low",1:"Very low"}[n];}
+  function kindTag(k){return {live:"LIVE",realestate:"REAL ESTATE",sports:"SPORTS",private:"PRIVATE",cash:"CASH"}[k]||"EST";}
+
+  // ---------- market status (US, ET) ----------
+  function marketStatus(){
+    var p=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour12:false,weekday:'short',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date());
+    var o={};p.forEach(function(x){o[x.type]=x.value;});
+    var mins=parseInt(o.hour,10)*60+parseInt(o.minute,10);
+    var isWeekday=["Mon","Tue","Wed","Thu","Fri"].indexOf(o.weekday)>=0;
+    return {open:isWeekday && mins>=570 && mins<960};
+  }
+  function renderMarket(){
+    var st=marketStatus(), live=st.open||forceLive;
+    var el=$("#mkt");
+    if(realData && !forceLive){
+      el.className="mkt open";
+      $("#mktlbl").textContent = st.open ? "LIVE · MARKET OPEN" : "LIVE · MARKET CLOSED";
+      return st.open;
+    }
+    el.className="mkt"+(live?" open":"");
+    $("#mktlbl").textContent = st.open ? "MARKET OPEN" : (forceLive ? "DEMO · SIMULATED" : "MARKET CLOSED");
+    return live;
+  }
+
+  // ---------- simulation ----------
+  function stepPrice(px){return Math.max(px*(1+(Math.random()-0.5)*0.004),0.01);}
+  function newSim(p){
+    var s={prices:{},aggSeries:[]}, L=46;
+    liveH(p).forEach(function(h){
+      var pc=PRICES[h.ticker], open=pc*(1+(Math.random()-0.5)*0.01);
+      var ser=[],px=open,hi=open,lo=open;
+      for(var i=0;i<L;i++){px=stepPrice(px);ser.push(px);hi=Math.max(hi,px);lo=Math.min(lo,px);}
+      s.prices[h.ticker]={prevClose:pc,open:open,last:ser[L-1],high:hi,low:lo,series:ser};
+    });
+    var st=staticTotal(p);
+    for(var i=0;i<L;i++){var v=st;liveH(p).forEach(function(h){v+=h.shares*s.prices[h.ticker].series[i];});s.aggSeries.push(v);}
+    s.open=s.aggSeries[0];
+    return s;
+  }
+
+  // ---------- render ----------
+  function render(){
+    if(!selected)return;
+    var p=selected, nw=nwNow(p), prevNW=nwPrev(p);
+    var dchg=nw-prevNW, dpct=(nw-prevNW)/prevNW*100, up=dchg>=0, cls=up?"up":"down", sign=up?"+":"−";
+    var high=Math.max.apply(null,sim.aggSeries), low=Math.min.apply(null,sim.aggSeries);
+    var prim=liveH(p)[0].ticker, primPx=sim.prices[prim].last, primUp=primPx>=sim.prices[prim].prevClose;
+
+    // holdings rows
+    var rows = p.holdings.map(function(h,idx){
+      if(h.kind==="live"){
+        var price=sim.prices[h.ticker].last, val=holdVal(h,price);
+        var sub = h.strike!=null
+          ? (h.shares/1e6).toFixed(0)+'M options @ $'+h.strike.toFixed(2)+' strike'
+          : (h.shares/1e6).toFixed(1)+'M sh × $<span id="px-'+idx+'">'+price.toFixed(2)+'</span>';
+        return '<div class="hold"><div><div class="ht">'+h.ticker+'  ·  '+h.label+'</div>'+
+          '<div class="hs">'+sub+'</div></div>'+
+          '<div class="hv" id="hv-'+idx+'">'+money(val)+'<span class="hbadge">LIVE</span></div></div>';
+      }
+      return '<div class="hold"><div><div class="ht">'+h.label+'</div>'+
+        '<div class="hs">'+(h.src||"")+'</div></div>'+
+        '<div class="hv">'+money(h.value)+'<span class="hbadge est">'+kindTag(h.kind)+'</span></div></div>';
+    }).join("");
+
+    var cov = staticTotal(p)>0 ? "+PRIV" : "PUBLIC";
+    var club = nw>=1e12 ? '<span class="club">🔥 TRILLIONAIRE · 4 COMMAS</span>' : '';
+
+    var html =
+    '<div class="phead"><span class="pname">'+p.name+'</span><span class="ptk">'+p.tk+'</span>'+club+'<span class="pco">'+p.co+'</span></div>'+
+    '<div class="nw" id="nwbig">$'+withCommas(nw)+'</div>'+
+    '<div class="chg" id="chgline"><span class="amt '+cls+'">'+sign+money(Math.abs(dchg))+'</span>'+
+      '<span class="pc '+cls+'">'+sign+Math.abs(dpct).toFixed(2)+'%</span><span class="when">Today</span></div>'+
+    '<div class="chartwrap"><canvas id="chart" width="1400" height="400"></canvas></div>'+
+    '<div class="ranges">'+["1D","1W","1M","YTD"].map(function(r){return '<button class="range'+(r===range?" active":"")+'" data-r="'+r+'">'+r+'</button>';}).join("")+'</div>'+
+    '<div class="grid">'+
+      '<div class="panel"><div class="ph">Today</div>'+
+        '<div class="row"><span class="k">Open</span><span class="v">'+money(sim.open)+'</span></div>'+
+        '<div class="row"><span class="k">High</span><span class="v">'+money(high)+'</span></div>'+
+        '<div class="row"><span class="k">Low</span><span class="v">'+money(low)+'</span></div>'+
+        '<div class="row"><span class="k">'+prim+' price</span><span class="v '+(primUp?"up":"down")+'" id="primpx">$'+primPx.toFixed(2)+'</span></div>'+
+      '</div>'+
+      '<div class="panel"><div class="ph">Confidence & Coverage</div>'+
+        '<div class="row"><span class="k">Estimate confidence</span><span class="stars">'+starHTML(p.conf)+'</span></div>'+
+        '<div class="row"><span class="k">Rating</span><span class="v">'+confWord(p.conf)+'</span></div>'+
+        '<div class="row"><span class="k">Coverage</span><span class="cov">'+cov+'</span></div>'+
+        '<div class="priv">'+p.note+'</div>'+
+      '</div>'+
+      '<div class="panel full"><div class="ph">Holdings</div>'+rows+
+        '<div class="holdtot"><span class="k">Total tracked net worth</span><span class="v" id="holdtot">'+money(nw)+'</span></div>'+
+      '</div>'+
+      eodPanel(p)+
+    '</div>';
+
+    $("#profile").innerHTML=html;
+    bindRanges();
+    drawChart();
+    bindHover();
+  }
+
+  function eodPanel(p){
+    if(marketStatus().open && !forceLive) return "";
+    var closeNW=nwNow(p), openNW=sim.open, d=closeNW-openNW, dp=(closeNW-openNW)/openNW*100, up=d>=0, cls=up?"up":"down", s=up?"+":"−";
+    var high=Math.max.apply(null,sim.aggSeries), low=Math.min.apply(null,sim.aggSeries);
+    return '<div class="panel full eod"><div class="ph">📊 End-of-day report</div><div class="eodgrid">'+
+      '<div class="eodcell"><div class="ek">Closed at</div><div class="ev">'+money(closeNW)+'</div></div>'+
+      '<div class="eodcell"><div class="ek">Day change</div><div class="ev '+cls+'">'+s+money(Math.abs(d))+' ('+s+Math.abs(dp).toFixed(2)+'%)</div></div>'+
+      '<div class="eodcell"><div class="ek">Intraday high</div><div class="ev">'+money(high)+'</div></div>'+
+      '<div class="eodcell"><div class="ek">Intraday low</div><div class="ev">'+money(low)+'</div></div>'+
+    '</div></div>';
+  }
+
+  // ---------- chart ----------
+  function seriesForRange(p){
+    if(range==="1D") return sim.aggSeries.slice();
+    var n={ "1W":30,"1M":40,"YTD":60 }[range], end=nwNow(p);
+    var v=end*({ "1W":0.97,"1M":0.91,"YTD":0.78 }[range]), pts=[];
+    for(var i=0;i<n;i++){v=v*(1+(Math.random()-0.46)*0.02);pts.push(v);}
+    pts.push(end);return pts;
+  }
+  function drawChart(){
+    var c=$("#chart");if(!c)return;var ctx=c.getContext("2d");
+    var W=c.width,H=c.height,pad=10;
+    ctx.clearRect(0,0,W,H);
+    var data=seriesForRange(selected); currentSeries=data; if(data.length<2)return;
+    var min=Math.min.apply(null,data),max=Math.max.apply(null,data),rng=(max-min)||1;
+    var up=data[data.length-1]>=data[0], col=up?getCSS('--gain'):getCSS('--loss');
+    function X(i){return pad+(W-2*pad)*(i/(data.length-1));}
+    function Y(v){return pad+(H-2*pad)*(1-(v-min)/rng);}
+    var g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,hexA(col,.22));g.addColorStop(1,hexA(col,0));
+    ctx.beginPath();ctx.moveTo(X(0),Y(data[0]));
+    for(var i=1;i<data.length;i++)ctx.lineTo(X(i),Y(data[i]));
+    ctx.lineTo(X(data.length-1),H);ctx.lineTo(X(0),H);ctx.closePath();ctx.fillStyle=g;ctx.fill();
+    ctx.beginPath();ctx.moveTo(X(0),Y(data[0]));
+    for(var j=1;j<data.length;j++)ctx.lineTo(X(j),Y(data[j]));
+    ctx.lineWidth=4;ctx.strokeStyle=col;ctx.lineJoin="round";ctx.stroke();
+    if(range==="1D"){
+      var by=Y(nwPrev(selected));
+      if(by>pad&&by<H-pad){ctx.setLineDash([5,6]);ctx.strokeStyle=hexA(getCSS('--muted'),.5);ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(pad,by);ctx.lineTo(W-pad,by);ctx.stroke();ctx.setLineDash([]);}
+    }
+    var ex=X(data.length-1),ey=Y(data[data.length-1]);
+    ctx.beginPath();ctx.arc(ex,ey,6,0,7);ctx.fillStyle=col;ctx.fill();
+    ctx.beginPath();ctx.arc(ex,ey,11,0,7);ctx.strokeStyle=hexA(col,.35);ctx.lineWidth=3;ctx.stroke();
+    // hover crosshair + tooltip
+    if(hoverIdx!=null && hoverIdx>=0 && hoverIdx<data.length){
+      var hx=X(hoverIdx),hv=data[hoverIdx],hy=Y(hv);
+      ctx.setLineDash([4,6]);ctx.strokeStyle=hexA(getCSS('--paper'),.22);ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(hx,pad);ctx.lineTo(hx,H-pad);ctx.stroke();ctx.setLineDash([]);
+      ctx.beginPath();ctx.arc(hx,hy,7,0,7);ctx.fillStyle=getCSS('--paper');ctx.fill();
+      ctx.beginPath();ctx.arc(hx,hy,7,0,7);ctx.lineWidth=3;ctx.strokeStyle=col;ctx.stroke();
+      drawTip(ctx,hx,hy,hv,W,H);
+    }
+  }
+  function drawTip(ctx,hx,hy,val,W,H){
+    var label=money(val), base=sim.open, dp=(val-base)/base*100, up=dp>=0;
+    var sub=(up?"+":"−")+Math.abs(dp).toFixed(2)+"% vs open";
+    ctx.font='800 30px "JetBrains Mono",monospace';var w1=ctx.measureText(label).width;
+    ctx.font='700 19px "JetBrains Mono",monospace';var w2=ctx.measureText(sub).width;
+    var bw=Math.max(w1,w2)+34,bh=74,bx=hx-bw/2;
+    bx=Math.max(6,Math.min(bx,W-bw-6));
+    var by=hy-bh-18; if(by<6)by=hy+18;
+    roundRect(ctx,bx,by,bw,bh,12);
+    ctx.fillStyle='rgba(15,21,18,.97)';ctx.fill();
+    ctx.lineWidth=1.5;ctx.strokeStyle=hexA(getCSS('--brass'),.32);ctx.stroke();
+    ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    ctx.font='800 30px "JetBrains Mono",monospace';ctx.fillStyle=getCSS('--paper');ctx.fillText(label,bx+17,by+35);
+    ctx.font='700 19px "JetBrains Mono",monospace';ctx.fillStyle=up?getCSS('--gain'):getCSS('--loss');ctx.fillText(sub,bx+17,by+59);
+  }
+  function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+  function getCSS(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+  function hexA(hex,a){var h=hex.replace('#','');return'rgba('+parseInt(h.substr(0,2),16)+','+parseInt(h.substr(2,2),16)+','+parseInt(h.substr(4,2),16)+','+a+')';}
+
+  function bindHover(){
+    var c=$("#chart");if(!c)return;
+    function locate(clientX){
+      if(!currentSeries)return;
+      var r=c.getBoundingClientRect(),frac=(clientX-r.left)/r.width;
+      frac=Math.max(0,Math.min(1,frac));
+      hoverIdx=Math.round(frac*(currentSeries.length-1));
+      drawChart();
+    }
+    c.addEventListener("mousemove",function(e){locate(e.clientX);});
+    c.addEventListener("mouseleave",function(){hoverIdx=null;drawChart();});
+    c.addEventListener("touchstart",function(e){if(e.touches[0])locate(e.touches[0].clientX);},{passive:true});
+    c.addEventListener("touchmove",function(e){if(e.touches[0])locate(e.touches[0].clientX);},{passive:true});
+    c.addEventListener("touchend",function(){hoverIdx=null;drawChart();});
+  }
+
+  // ---------- live tick ----------
+  function tick(){
+    var live=renderMarket();
+    if(!selected)return;
+    if(realData && !forceLive)return;
+    if(live && range==="1D"){
+      var prevNW=nwNow(selected);
+      liveH(selected).forEach(function(h){
+        var pr=sim.prices[h.ticker];
+        pr.last=stepPrice(pr.last);pr.high=Math.max(pr.high,pr.last);pr.low=Math.min(pr.low,pr.last);
+        pr.series.push(pr.last);if(pr.series.length>120)pr.series.shift();
+      });
+      var nw=nwNow(selected);
+      sim.aggSeries.push(nw);if(sim.aggSeries.length>120)sim.aggSeries.shift();
+      // big number + flash
+      var big=$("#nwbig");
+      if(big){big.innerHTML="$"+withCommas(nw);big.classList.remove("flash-up","flash-down");void big.offsetWidth;big.classList.add(nw>=prevNW?"flash-up":"flash-down");}
+      // change line
+      var pv=nwPrev(selected),dchg=nw-pv,dpct=(nw-pv)/pv*100,up=dchg>=0,cls=up?"up":"down",sign=up?"+":"−";
+      var chg=$("#chgline");
+      if(chg)chg.innerHTML='<span class="amt '+cls+'">'+sign+money(Math.abs(dchg))+'</span><span class="pc '+cls+'">'+sign+Math.abs(dpct).toFixed(2)+'%</span><span class="when">Today</span>';
+      // holdings live values
+      selected.holdings.forEach(function(h,idx){
+        if(h.kind!=="live")return;
+        var price=sim.prices[h.ticker].last;
+        var hv=document.getElementById("hv-"+idx);if(hv)hv.innerHTML=money(holdVal(h,price))+'<span class="hbadge">LIVE</span>';
+        var px=document.getElementById("px-"+idx);if(px)px.textContent=price.toFixed(2);
+      });
+      var prim=liveH(selected)[0].ticker, pe=document.getElementById("primpx");
+      if(pe){pe.textContent="$"+sim.prices[prim].last.toFixed(2);pe.className="v "+(sim.prices[prim].last>=sim.prices[prim].prevClose?"up":"down");}
+      var tot=document.getElementById("holdtot");if(tot)tot.textContent=money(nw);
+      drawChart();
+    }
+  }
+
+  // ---------- real price data (Phase 1: /api/quotes proxy) ----------
+  function tickerSet(){
+    var s=liveH(selected).map(function(h){return h.ticker;});
+    return s.filter(function(v,i){return s.indexOf(v)===i;});
+  }
+  async function pullReal(){
+    if(!selected)return;
+    var syms=tickerSet();
+    try{
+      var res=await fetch('/api/quotes?symbols='+encodeURIComponent(syms.join(',')));
+      if(!res.ok)throw 0;
+      var data=await res.json(), got=false;
+      syms.forEach(function(t){
+        var qd=data[t];
+        if(qd&&qd.c){
+          var pr=sim.prices[t];
+          pr.prevClose=qd.pc||pr.prevClose;
+          if(qd.o)pr.open=qd.o;
+          pr.last=qd.c;
+          if(!realSeeded){pr.series=[qd.c];pr.high=qd.h||qd.c;pr.low=qd.l||qd.c;}
+          else{pr.high=Math.max(pr.high,qd.c);pr.low=Math.min(pr.low,qd.c);pr.series.push(qd.c);if(pr.series.length>400)pr.series.shift();}
+          got=true;
+        }
+      });
+      if(got){
+        if(!realSeeded){
+          sim.open=nwAt(selected,function(t){return sim.prices[t].open||sim.prices[t].prevClose;});
+          sim.aggSeries=[nwNow(selected)];
+          realSeeded=true;
+        }else{
+          sim.aggSeries.push(nwNow(selected));if(sim.aggSeries.length>400)sim.aggSeries.shift();
+        }
+        realData=true;
+        render();
+      }
+    }catch(e){ /* no backend / offline — simulator keeps the page alive */ }
+  }
+
+  // ---------- selection + search ----------
+  function select(id){
+    selected=ROSTER.filter(function(r){return r.id===id;})[0];
+    sim=newSim(selected);range="1D";hoverIdx=null;realSeeded=false;
+    $("#q").value="";$("#results").classList.remove("show");
+    render();
+    pullReal();
+  }
+  function bindRanges(){
+    var btns=document.querySelectorAll(".range");
+    for(var i=0;i<btns.length;i++)btns[i].addEventListener("click",function(){
+      range=this.getAttribute("data-r");hoverIdx=null;
+      var all=document.querySelectorAll(".range");
+      for(var k=0;k<all.length;k++)all[k].classList.toggle("active",all[k]===this);
+      drawChart();
+    });
+  }
+  function renderResults(qv){
+    var box=$("#results"),q=qv.toLowerCase().trim();
+    var list=ROSTER.filter(function(r){return !q||r.name.toLowerCase().indexOf(q)>=0||r.tk.toLowerCase().indexOf(q)>=0||r.co.toLowerCase().indexOf(q)>=0;});
+    if(!list.length){box.classList.remove("show");return;}
+    box.innerHTML=list.map(function(r){return '<div class="res" data-id="'+r.id+'"><span class="tk">'+r.tk+'</span><span class="nm">'+r.name+'</span><span class="co">'+r.co+'</span></div>';}).join("");
+    box.classList.add("show");
+    var items=box.querySelectorAll(".res");
+    for(var i=0;i<items.length;i++)items[i].addEventListener("mousedown",function(e){e.preventDefault();select(this.getAttribute("data-id"));});
+  }
+
+  var q=$("#q");
+  q.addEventListener("input",function(){renderResults(this.value);});
+  q.addEventListener("focus",function(){renderResults(this.value);});
+  document.addEventListener("click",function(e){if(!e.target.closest(".search"))$("#results").classList.remove("show");});
+  $("#simtoggle").addEventListener("click",function(){forceLive=!forceLive;this.classList.toggle("on",forceLive);if(selected)render();else renderMarket();});
+
+  renderMarket();
+  select("musk");           // load Musk by default — he's the live story right now
+  setInterval(tick,1300);
+  setInterval(pullReal,15000);   // refresh real prices every 15s
+})();
+</script>
