@@ -114,8 +114,11 @@
   .mvrank{font-family:'JetBrains Mono';font-size:11px;color:var(--muted);width:13px;flex:0 0 auto}
   .mvname{font-weight:600;font-size:13px;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mvtk{font-family:'JetBrains Mono';font-size:10px;color:var(--brass);flex:0 0 auto}
-  .mvpct{font-family:'JetBrains Mono';font-weight:700;font-size:12.5px;width:60px;text-align:right;flex:0 0 auto}
+  .mvval{display:flex;flex-direction:column;align-items:flex-end;flex:0 0 auto;width:74px}
+  .mvpct{font-family:'JetBrains Mono';font-weight:700;font-size:12.5px;line-height:1.15;text-align:right}
   .mvpct.up{color:var(--gain)} .mvpct.down{color:var(--loss)}
+  .mvdelta{font-family:'JetBrains Mono';font-weight:600;font-size:9.5px;line-height:1.2;margin-top:1px;text-align:right;opacity:.72}
+  .mvdelta.up{color:var(--gain)} .mvdelta.down{color:var(--loss)}
   .mvempty{color:var(--muted);font-size:12px;padding:6px 0}
   .mvnote{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.04em;color:var(--muted);margin-top:16px;line-height:1.55;border-top:1px solid var(--hair-2);padding-top:12px}
 </style>
@@ -550,15 +553,17 @@
   function nwWith(p,fn){var s=staticTotal(p);liveH(p).forEach(function(h){s+=holdVal(h,fn(h.ticker));});return s;}
   function mPrice(t){return MARKET[t]?MARKET[t].price:(PRICES[t]||0);}
   function mBase(t){return MARKET[t]?MARKET[t].base:(PRICES[t]||0);}
-  function personPct(p){var cur=nwWith(p,mPrice),base=nwWith(p,mBase);return base?((cur-base)/base*100):0;}
+  function personMove(p){var cur=nwWith(p,mPrice),base=nwWith(p,mBase);return {pct:base?((cur-base)/base*100):0,delta:cur-base};}
 
   function moverRows(list,cls){
     return list.map(function(x,i){var p=x.p,prim=liveH(p)[0].ticker,sign=x.pct>=0?"+":"−";
-      return '<div class="mvrow" data-id="'+p.id+'"><span class="mvrank">'+(i+1)+'</span><span class="mvname">'+p.name+'</span><span class="mvtk">'+prim+'</span><span class="mvpct '+cls+'">'+sign+Math.abs(x.pct).toFixed(2)+'%</span></div>';
+      return '<div class="mvrow" data-id="'+p.id+'"><span class="mvrank">'+(i+1)+'</span><span class="mvname">'+p.name+'</span><span class="mvtk">'+prim+'</span>'+
+        '<span class="mvval"><span class="mvpct '+cls+'">'+sign+Math.abs(x.pct).toFixed(2)+'%</span>'+
+        '<span class="mvdelta '+cls+'">'+sign+money(Math.abs(x.delta))+'</span></span></div>';
     }).join("");
   }
   function renderMovers(){
-    var ranked=ROSTER.map(function(p){return {p:p,pct:personPct(p)};});
+    var ranked=ROSTER.map(function(p){var m=personMove(p);return {p:p,pct:m.pct,delta:m.delta};});
     var gainers=ranked.filter(function(x){return x.pct>=0;}).sort(function(a,b){return b.pct-a.pct;}).slice(0,5);
     var losers=ranked.filter(function(x){return x.pct<0;}).sort(function(a,b){return a.pct-b.pct;}).slice(0,5);
     var g=$("#gainers"),l=$("#losers");
