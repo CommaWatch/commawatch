@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- INTERNAL TOOL — not linked from the public site. Generates daily social cards. -->
+<meta name="robots" content="noindex, nofollow">
+<title>CommaWatch · Studio (internal)</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+  :root{
+    --obsidian:#0A0E0C; --surface:#0F1512; --surface-2:#131A16;
+    --hair:rgba(244,239,230,.10); --hair-2:rgba(244,239,230,.06);
+    --brass:#E8B84B; --brass-dim:rgba(232,184,75,.16);
+    --paper:#F4EFE6; --muted:#8B9B90;
+    --gain:#36D399; --loss:#FF6B6B;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--obsidian);color:var(--paper);font-family:'Inter',system-ui,sans-serif;padding:24px 20px 80px}
+  .top{max-width:1280px;margin:0 auto 26px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .wm{font-family:'Archivo';font-weight:800;letter-spacing:.13em;font-size:20px}
+  .wm .c{color:var(--brass)}
+  .tag{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);border:1px solid var(--hair);border-radius:6px;padding:4px 8px}
+  .src{margin-left:auto;display:flex;align-items:center;gap:10px;font-family:'JetBrains Mono';font-size:11px;letter-spacing:.06em}
+  .badge{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:6px 12px;border:1px solid var(--hair)}
+  .badge .dot{width:8px;height:8px;border-radius:50%}
+  .badge.live{color:var(--gain);border-color:rgba(54,211,153,.3)} .badge.live .dot{background:var(--gain)}
+  .badge.demo{color:var(--brass);border-color:var(--brass-dim)} .badge.demo .dot{background:var(--brass)}
+  .btn{font-family:'JetBrains Mono';font-size:12px;letter-spacing:.05em;color:var(--obsidian);background:var(--brass);border:0;border-radius:9px;padding:9px 14px;cursor:pointer;font-weight:700}
+  .btn.ghost{color:var(--paper);background:none;border:1px solid var(--hair)}
+  .demowarn{max-width:1280px;margin:0 auto 22px;font-family:'JetBrains Mono';font-size:12px;color:var(--brass);background:linear-gradient(180deg,#15180e,#0d100a);border:1px solid var(--brass-dim);border-radius:10px;padding:12px 15px;line-height:1.5}
+
+  .deck{max-width:1280px;margin:0 auto;display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+  .block{flex:1 1 360px;max-width:420px;min-width:340px}
+  .blockh{font-family:'JetBrains Mono';font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:12px}
+
+  /* on-screen preview of the 1080×1080 card */
+  .cardview{width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:16px;border:1px solid var(--hair);position:relative}
+  .cardscale{position:absolute;top:0;left:0;transform-origin:top left}
+
+  /* ---- the real 1080×1080 card (scaled for preview, captured at full size) ---- */
+  .card{width:1080px;height:1080px;position:relative;overflow:hidden;background:var(--obsidian);
+    display:flex;flex-direction:column;justify-content:space-between;padding:96px 90px;font-family:'Inter',sans-serif}
+  .card .label{font-family:'JetBrains Mono';font-weight:800;font-size:30px;letter-spacing:.22em;text-transform:uppercase;display:flex;align-items:center;gap:18px}
+  .card .name{font-family:'Archivo';font-weight:900;font-size:96px;line-height:.98;letter-spacing:.005em;margin-top:8px}
+  .card .co{font-family:'JetBrains Mono';font-weight:700;font-size:26px;letter-spacing:.06em;color:var(--muted);margin-top:18px}
+  .card .nwwrap{margin-top:10px}
+  .card .nwlbl{font-family:'JetBrains Mono';font-weight:700;font-size:22px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  .card .nw{font-family:'JetBrains Mono';font-weight:800;font-size:96px;letter-spacing:-.01em;white-space:nowrap;color:var(--paper)}
+  /* the signature glowing-comma treatment */
+  .card .nw .cm{color:var(--brass);text-shadow:0 0 18px rgba(232,184,75,.85),0 0 46px rgba(232,184,75,.5)}
+  .card .chg{font-family:'JetBrains Mono';font-weight:800;font-size:52px;margin-top:26px;display:flex;align-items:baseline;gap:22px}
+  .card .chg .pct{font-size:40px}
+  .card .foot{display:flex;align-items:center;justify-content:space-between}
+  .card .fwm{font-family:'Archivo';font-weight:800;letter-spacing:.14em;font-size:30px}
+  .card .fwm .c{color:var(--brass)}
+  .card .fdate{font-family:'JetBrains Mono';font-weight:700;font-size:22px;letter-spacing:.08em;color:var(--muted)}
+  .up{color:var(--gain)} .down{color:var(--loss)} .brassc{color:var(--brass)}
+
+  /* WINNER — celebratory: warm green wash + glow */
+  .card.winner{background:radial-gradient(120% 80% at 78% 8%, rgba(54,211,153,.22), rgba(10,14,12,0) 55%), var(--obsidian)}
+  .card.winner .label{color:var(--gain)}
+  .card.winner .arrow{font-size:40px}
+  .card.winner::after{content:"";position:absolute;left:0;right:0;bottom:0;height:8px;background:linear-gradient(90deg,var(--gain),rgba(54,211,153,0))}
+
+  /* LOSER — stark: deep flat black, thin coral, lots of negative space */
+  .card.loser{background:radial-gradient(120% 90% at 50% 120%, rgba(255,107,107,.10), rgba(10,14,12,0) 60%), #070908}
+  .card.loser .label{color:var(--loss)}
+  .card.loser .name{font-size:104px}
+  .card.loser::before{content:"";position:absolute;top:0;left:90px;right:90px;height:2px;background:rgba(255,107,107,.35)}
+
+  /* COMMA ALERT — dramatic milestone: brass rays + giant ghost comma */
+  .card.alert{background:radial-gradient(90% 70% at 50% 18%, rgba(232,184,75,.26), rgba(10,14,12,0) 60%), linear-gradient(180deg,#16130a,#0A0E0C 70%)}
+  .card.alert .label{color:var(--brass)}
+  .card.alert .ghost{position:absolute;right:-40px;bottom:-160px;font-family:'Archivo';font-weight:900;font-size:760px;line-height:1;color:rgba(232,184,75,.10);pointer-events:none}
+  .card.alert .milestone{font-family:'Archivo';font-weight:900;font-size:86px;line-height:1;color:var(--brass);text-shadow:0 0 30px rgba(232,184,75,.5);margin-top:6px}
+  .card.alert .sub{font-family:'JetBrains Mono';font-weight:700;font-size:28px;letter-spacing:.05em;color:var(--paper);margin-top:20px}
+  .card.alert::after{content:"";position:absolute;left:0;right:0;bottom:0;height:10px;background:linear-gradient(90deg,rgba(232,184,75,0),var(--brass),rgba(232,184,75,0))}
+
+  .dl{margin-top:14px}
+  .caps{margin-top:18px;display:flex;flex-direction:column;gap:10px}
+  .caph{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+  .cap{position:relative;background:var(--surface);border:1px solid var(--hair);border-radius:11px;padding:13px 44px 13px 14px;font-size:13.5px;line-height:1.5;cursor:pointer;transition:border-color .15s}
+  .cap:hover{border-color:var(--brass-dim)}
+  .cap .copy{position:absolute;right:10px;top:10px;font-family:'JetBrains Mono';font-size:9px;letter-spacing:.08em;color:var(--muted);border:1px solid var(--hair);border-radius:5px;padding:3px 6px}
+  .cap.copied{border-color:var(--gain)} .cap.copied .copy{color:var(--gain);border-color:rgba(54,211,153,.4)}
+  .empty{flex:1 1 100%;color:var(--muted);font-size:13px;font-family:'JetBrains Mono';border:1px dashed var(--hair);border-radius:12px;padding:18px}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="wm">COMMA<span class="c">,</span>WATCH</div>
+    <span class="tag">Studio · internal</span>
+    <div class="src">
+      <span id="srcbadge" class="badge demo"><span class="dot"></span><span id="srclbl">…</span></span>
+      <button class="btn ghost" id="regen">↻ Regenerate</button>
+    </div>
+  </div>
+
+  <div class="demowarn" id="demowarn" style="display:none">
+    ⚠ DEMO DATA — no live price feed connected. These numbers are simulated; connect live prices before publishing.
+  </div>
+
+  <div class="deck" id="deck"></div>
+
+<script src="core.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+(function(){
+  "use strict";
+  var $=function(s){return document.querySelector(s);};
+
+  // ---- price data: same "Day" logic as index.html (live quote `c` vs prev close `pc`) ----
+  // MARKET[ticker] = {c, pc}. Live: from /api/quotes. Tickers without a quote fall back to the
+  // shared PRICES seed (flat). Offline/no backend: a stable demo drift so cards still render.
+  var MARKET={}, dataLive=false;
+
+  function hash01(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return ((h>>>0)%100000)/100000;}
+  function demoDrift(t){return (hash01("day|"+t)-0.5)*2*0.025;} // ±2.5% stable per ticker
+  function priceNow(t){return MARKET[t]?MARKET[t].c:(PRICES[t]||0);}
+  function pricePrev(t){return MARKET[t]?MARKET[t].pc:(PRICES[t]||0);}
+
+  async function loadPrices(){
+    var syms=allTickers();
+    try{
+      var res=await fetch('/api/quotes?symbols='+encodeURIComponent(syms.join(',')));
+      if(!res.ok)throw 0;
+      var data=await res.json(), any=false, m={};
+      syms.forEach(function(t){
+        var q=data[t];
+        if(q&&q.c){ m[t]={c:q.c,pc:(q.pc||q.c)}; any=true; }
+        else { m[t]={c:PRICES[t],pc:PRICES[t]}; } // no live quote (e.g. SPCX) → flat
+      });
+      if(!any)throw 0;
+      MARKET=m; dataLive=true;
+    }catch(e){
+      // offline / no backend — stable demo so the studio never looks broken
+      var m={}; syms.forEach(function(t){ m[t]={c:PRICES[t]*(1+demoDrift(t)), pc:PRICES[t]}; });
+      MARKET=m; dataLive=false;
+    }
+  }
+
+  // ---- per-person day move, computed with the SHARED net-worth math (core.js nwAt) ----
+  function dayMove(p){
+    var now=nwAt(p,priceNow), prev=nwAt(p,pricePrev);
+    return {p:p, now:now, prev:prev, delta:now-prev, pct:prev?((now-prev)/prev*100):0};
+  }
+
+  // ---- comma-boundary detection ($1B / $1T): near or crossed today ----
+  var BOUNDARIES=[{v:1e12,label:"$1 TRILLION",commas:4},{v:1e9,label:"$1 BILLION",commas:3}];
+  var NEAR=0.12; // within 12% of a $1B/$1T line counts as "near" the milestone (or crossed today)
+  function commaAlert(moves){
+    var best=null;
+    moves.forEach(function(m){
+      BOUNDARIES.forEach(function(b){
+        var crossed=(m.prev<b.v)!==(m.now<b.v);
+        var dist=Math.abs(m.now-b.v)/b.v;
+        if(!crossed && dist>NEAR) return;
+        var above=m.now>=b.v;
+        var kind = crossed ? (above?"crossed-up":"crossed-down") : (above?"past":"approaching");
+        // score: crossings beat proximity; bigger boundary wins ties; then closer
+        var score=(crossed?1000:0)+(b.v>=1e12?100:0)+(1-dist);
+        var cand={m:m,b:b,crossed:crossed,above:above,kind:kind,dist:dist,score:score};
+        if(!best||cand.score>best.score)best=cand;
+      });
+    });
+    return best;
+  }
+
+  // ---------- formatting for the card ----------
+  function signMoney(n){return (n>=0?"+":"−")+money(Math.abs(n));}
+  function signPct(n){return (n>=0?"+":"−")+Math.abs(n).toFixed(2)+"%";}
+  function todayStr(){
+    return new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric'}).format(new Date()).toUpperCase();
+  }
+
+  // ---------- captions (punchy, spectator-sport, lead with the $ swing, end on a hook) ----------
+  function captionsFor(type,m,alert){
+    var name=m.p.name, tk=liveH(m.p)[0].ticker;
+    var d=money(Math.abs(m.delta)), pct=Math.abs(m.pct).toFixed(1), nw=money(m.now);
+    if(type==="winner"){
+      return [
+        "+"+d+" before lunch. "+name+" is up "+pct+"% today as "+tk+" runs hot. The commas are multiplying. 📈 How many is that now?",
+        name+" just printed +"+d+" in a single session ("+tk+" +"+pct+"%). Some people have a good day. We watch the commas so you don't have to.",
+        "Green at the very top: "+name+" +"+d+" today, now sitting on "+nw+". Screenshot it before it moves again. 👀"
+      ];
+    }
+    if(type==="loser"){
+      return [
+        "Tough day to be a billionaire. "+name+" just dropped "+d+" as "+tk+" slid "+pct+"%. Watching the commas so you don't have to.",
+        "−"+d+" before you finished your coffee. "+name+"'s "+tk+" is having a day ("+pct+"% down) — still richer than your entire city, though.",
+        name+" is down "+d+" today ("+pct+"%). The commas giveth and the commas taketh away. 📉 Down to "+nw+"."
+      ];
+    }
+    // comma alert
+    var b=alert.b.label, verb = alert.crossed ? (alert.above?"just crossed":"just dropped below") : (alert.above?"is holding above":"is closing in on");
+    return [
+      "COMMA ALERT 🚨 "+name+" "+verb+" "+b+" — net worth "+nw+" today ("+signPct(m.pct)+"). That's "+alert.b.commas+" commas. We watch them so you don't have to.",
+      signMoney(m.delta)+" today and "+name+" "+verb+" the "+b+" line. "+nw+" and counting. Add a comma, change the conversation.",
+      name+" vs "+b+": "+nw+" ("+signPct(m.pct)+" today). "+(alert.above?"The "+alert.b.commas+"-comma club has a "+(alert.b.commas===4?"new tier":"member")+".":"So close you can count the zeros.")+" 👀"
+    ];
+  }
+
+  // ---------- build one card block (preview + download + captions) ----------
+  function cardInner(type,m,alert){
+    var name=m.p.name, label, extra="", ghost="";
+    if(type==="winner"){ label='<span class="label"><span class="arrow">▲</span> Today\'s Top Gainer</span>'; }
+    else if(type==="loser"){ label='<span class="label"><span class="arrow">▼</span> Today\'s Top Loser</span>'; }
+    else {
+      label='<span class="label">◆ Comma Alert</span>';
+      var ms = alert.crossed ? (alert.above?"CROSSED "+alert.b.label:"FELL BELOW "+alert.b.label)
+                             : (alert.above?"PAST "+alert.b.label:"APPROACHING "+alert.b.label);
+      extra='<div class="milestone">'+ms+'</div><div class="sub">'+alert.b.commas+' commas · '+(alert.above?'in the club':'on the doorstep')+'</div>';
+      ghost='<div class="ghost">,</div>';
+    }
+    var cls = m.delta>=0?"up":"down";
+    var chg='<div class="chg"><span class="'+(type==="alert"?"brassc":cls)+'">'+signMoney(m.delta)+'</span>'+
+            '<span class="pct '+cls+'">'+signPct(m.pct)+'</span></div>';
+    return ghost+
+      '<div>'+label+
+        '<div class="name">'+name+'</div>'+
+        '<div class="co">'+m.p.co+'</div>'+
+      '</div>'+
+      '<div class="nwwrap">'+
+        '<div class="nwlbl">Net worth</div>'+
+        '<div class="nw">$'+withCommas(m.now)+'</div>'+
+        chg+ (type==="alert"?extra:"") +
+      '</div>'+
+      '<div class="foot"><span class="fwm">COMMA<span class="c">,</span>WATCH</span><span class="fdate">'+todayStr()+'</span></div>';
+  }
+
+  function fitNetWorth(card){
+    var nw=card.querySelector(".nw"); if(!nw)return;
+    var max=1080-180; var size=96;
+    nw.style.fontSize=size+"px";
+    while(nw.scrollWidth>max && size>40){ size-=2; nw.style.fontSize=size+"px"; }
+  }
+
+  var CARD_W=1080;
+  function buildBlock(type,m,alert,heading){
+    var block=document.createElement("div"); block.className="block";
+    var cardId="card-"+type;
+    block.innerHTML=
+      '<div class="blockh">'+heading+'</div>'+
+      '<div class="cardview"><div class="cardscale" id="scale-'+type+'">'+
+        '<div class="card '+type+'" id="'+cardId+'">'+cardInner(type,m,alert)+'</div>'+
+      '</div></div>'+
+      '<div class="dl"><button class="btn" data-dl="'+cardId+'" data-type="'+type+'" data-id="'+m.p.id+'">⬇ Download PNG</button></div>'+
+      '<div class="caps"><div class="caph">Captions — tap to copy</div></div>';
+    // captions
+    var caps=block.querySelector(".caps");
+    captionsFor(type,m,alert).forEach(function(txt){
+      var el=document.createElement("div"); el.className="cap";
+      el.innerHTML='<span class="copy">COPY</span>'+txt.replace(/</g,"&lt;");
+      el.addEventListener("click",function(){ copyText(txt, el); });
+      caps.appendChild(el);
+    });
+    return block;
+  }
+
+  function copyText(txt, el){
+    var done=function(){ el.classList.add("copied"); var c=el.querySelector(".copy"); if(c)c.textContent="COPIED"; setTimeout(function(){el.classList.remove("copied"); if(c)c.textContent="COPY";},1400); };
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done,function(){fallbackCopy(txt);done();}); }
+    else { fallbackCopy(txt); done(); }
+  }
+  function fallbackCopy(txt){ var ta=document.createElement("textarea"); ta.value=txt; document.body.appendChild(ta); ta.select(); try{document.execCommand("copy");}catch(e){} document.body.removeChild(ta); }
+
+  // fit the scaled preview to the cardview width
+  function scalePreview(type){
+    var view=$("#scale-"+type).parentElement;
+    var s=view.clientWidth/CARD_W;
+    $("#scale-"+type).style.transform="scale("+s+")";
+  }
+
+  // ---------- PNG capture (full 1080×1080, fonts guaranteed loaded) ----------
+  async function downloadCard(cardId, type, personId){
+    await fontsReady();
+    var card=document.getElementById(cardId);
+    var canvas=await html2canvas(card,{
+      backgroundColor:"#0A0E0C", width:CARD_W, height:CARD_W, scale:1, useCORS:true,
+      onclone:function(doc){
+        var c=doc.getElementById(cardId);
+        if(c){ c.style.transform="none"; c.style.transformOrigin="top left"; var w=c.parentElement;
+          if(w){ w.style.transform="none"; w.style.width=CARD_W+"px"; w.style.height=CARD_W+"px"; } }
+      }
+    });
+    canvas.toBlob(function(blob){
+      var a=document.createElement("a");
+      a.href=URL.createObjectURL(blob);
+      a.download="commawatch-"+type+"-"+personId+".png";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){URL.revokeObjectURL(a.href);},2000);
+    },"image/png");
+  }
+
+  function fontsReady(){
+    if(!document.fonts||!document.fonts.ready) return Promise.resolve();
+    // nudge the specific weights/families the cards use, then wait for all to settle
+    try{
+      document.fonts.load('900 96px "Archivo"');
+      document.fonts.load('800 96px "JetBrains Mono"');
+      document.fonts.load('700 26px "JetBrains Mono"');
+    }catch(e){}
+    return document.fonts.ready;
+  }
+
+  // ---------- render ----------
+  async function render(){
+    await loadPrices();
+
+    // data-source UI
+    var badge=$("#srcbadge");
+    badge.className="badge "+(dataLive?"live":"demo");
+    $("#srclbl").textContent=dataLive?"LIVE DATA":"DEMO DATA";
+    $("#demowarn").style.display=dataLive?"none":"block";
+
+    var moves=ROSTER.map(dayMove);
+    var sortedByPct=moves.slice().sort(function(a,b){return b.pct-a.pct;});
+    var gainer=sortedByPct[0];
+    var loser=sortedByPct[sortedByPct.length-1];
+    var alert=commaAlert(moves);
+
+    var deck=$("#deck"); deck.innerHTML="";
+    deck.appendChild(buildBlock("winner",gainer,null,"1 · Today's Top Gainer"));
+    deck.appendChild(buildBlock("loser",loser,null,"2 · Today's Top Loser"));
+    if(alert){
+      deck.appendChild(buildBlock("alert",alert.m,alert,"3 · Comma Alert"));
+    }else{
+      var none=document.createElement("div"); none.className="empty";
+      none.textContent="No Comma Alert today — nobody is near or across a $1B / $1T boundary.";
+      deck.appendChild(none);
+    }
+
+    await fontsReady();
+    ["winner","loser","alert"].forEach(function(t){
+      var card=document.getElementById("card-"+t);
+      if(card){ fitNetWorth(card); scalePreview(t); }
+    });
+
+    // wire downloads
+    var btns=document.querySelectorAll("[data-dl]");
+    for(var i=0;i<btns.length;i++){
+      btns[i].addEventListener("click",function(){
+        var b=this; var old=b.textContent; b.textContent="Rendering…"; b.disabled=true;
+        downloadCard(b.getAttribute("data-dl"),b.getAttribute("data-type"),b.getAttribute("data-id"))
+          .then(function(){b.textContent=old;b.disabled=false;})
+          .catch(function(){b.textContent="Failed — retry";b.disabled=false;});
+      });
+    }
+  }
+
+  $("#regen").addEventListener("click",render);
+  window.addEventListener("resize",function(){ ["winner","loser","alert"].forEach(function(t){ if(document.getElementById("card-"+t)) scalePreview(t); }); });
+
+  render();
+})();
+</script>
+</body>
+</html>
