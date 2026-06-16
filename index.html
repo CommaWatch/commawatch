@@ -121,6 +121,7 @@
   .mvdelta.up{color:var(--gain)} .mvdelta.down{color:var(--loss)}
   .mvempty{color:var(--muted);font-size:12px;padding:6px 0}
   .mvnote{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.04em;color:var(--muted);margin-top:16px;line-height:1.55;border-top:1px solid var(--hair-2);padding-top:12px}
+  .mvnote.warn{color:var(--brass);border-top-color:var(--brass-dim)}
 </style>
 
 <div class="shell">
@@ -541,7 +542,7 @@
   $("#simtoggle").addEventListener("click",function(){forceLive=!forceLive;this.classList.toggle("on",forceLive);if(selected)render();else renderMarket();});
 
   // ---------- Top Movers ----------
-  var moversPeriod="Day", MARKET={}, moversReal=false;
+  var moversPeriod="Day", MARKET={}, moversReal=false, moversRefOK=true;
   var PERIODKEY={Day:"day",WTD:"wtd",MTD:"mtd",YTD:"ytd"};
   var PERIODLBL={Day:"vs prev close",WTD:"vs week start",MTD:"vs month start",YTD:"vs year start"};
 
@@ -570,7 +571,19 @@
     if(g)g.innerHTML=moverRows(gainers,"up")||'<div class="mvempty">No gainers</div>';
     if(l)l.innerHTML=moverRows(losers,"down")||'<div class="mvempty">No losers</div>';
     var note=$("#mvnote");
-    if(note)note.textContent=(moversReal?"Live ranking · ":"Demo ranking · ")+PERIODLBL[moversPeriod]+". Ranked by net-worth change; private holdings are estimates.";
+    if(note){
+      var warn=false, txt;
+      if(!moversReal){
+        txt="Demo ranking · "+PERIODLBL[moversPeriod]+". Ranked by net-worth change; private holdings are estimates.";
+      }else if(moversRefOK){
+        txt="Live ranking · "+PERIODLBL[moversPeriod]+". Ranked by net-worth change; private holdings are estimates.";
+      }else{
+        warn=true;
+        txt="⚠ "+moversPeriod+" needs historical data — not connected yet, so this currently mirrors the Day baseline rather than true "+moversPeriod+" movement.";
+      }
+      note.textContent=txt;
+      note.classList.toggle("warn",warn);
+    }
     bindMoverRows();
   }
   function bindMoverRows(){var rows=document.querySelectorAll(".mvrow");for(var i=0;i<rows.length;i++)rows[i].addEventListener("click",function(){select(this.getAttribute("data-id"));});}
@@ -580,9 +593,17 @@
     try{
       var res=await fetch('/api/quotes?symbols='+encodeURIComponent(syms.join(','))+'&period='+pk);
       if(!res.ok)throw 0;
-      var data=await res.json(), any=false, m={};
-      syms.forEach(function(t){var qd=data[t];if(qd&&qd.c){var base=pk==="day"?(qd.pc||qd.c):(qd.ref||qd.pc||qd.c);m[t]={price:qd.c,base:base};any=true;}});
+      var data=await res.json(), any=false, refSeen=false, refAll=true, m={};
+      syms.forEach(function(t){var qd=data[t];if(qd&&qd.c){
+        var base;
+        if(pk==="day"){base=qd.pc||qd.c;}
+        else if(qd.ref!=null){base=qd.ref;refSeen=true;}
+        else{base=qd.pc||qd.c;refAll=false;} // no historical ref for this ticker — falls back to prev close
+        m[t]={price:qd.c,base:base};any=true;
+      }});
       if(!any)throw 0;
+      // For non-day periods we only call it "real" ranking when every ticker had a true period-start ref.
+      moversRefOK = (pk==="day") || (refSeen && refAll);
       MARKET=m;moversReal=true;renderMovers();
     }catch(e){ if(!moversReal)seedDemoMarket(pk); renderMovers(); }
   }
