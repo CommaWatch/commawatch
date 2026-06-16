@@ -12,7 +12,10 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--obsidian);color:var(--paper);font-family:'Inter',system-ui,sans-serif;padding:22px 18px 70px;-webkit-text-size-adjust:100%}
-  .wrap{max-width:760px;margin:0 auto}
+  .shell{display:flex;gap:24px;align-items:flex-start;max-width:1080px;margin:0 auto}
+  .wrap{max-width:760px;flex:1 1 0;min-width:0}
+  .movers{flex:0 0 252px;position:sticky;top:22px}
+  @media(max-width:900px){.shell{flex-direction:column}.movers{flex:1 1 auto;width:100%;position:static;order:2}.wrap{order:1;max-width:none}}
   .cm{color:var(--brass)}
 
   .bar{display:flex;align-items:center;gap:14px;margin-bottom:18px}
@@ -96,8 +99,40 @@
   .toggle.on .sw{background:var(--brass-dim)} .toggle.on .sw::after{left:18px;background:var(--brass)}
   .note{margin-top:16px;color:var(--muted);font-size:12.5px;line-height:1.6;border-top:1px solid var(--hair);padding-top:16px}
   .note b{color:var(--paper);font-weight:600}
+
+  /* Top Movers */
+  .movers .ph{margin-bottom:12px}
+  .mvtabs{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px}
+  .mvtab{font-family:'JetBrains Mono';font-size:10.5px;letter-spacing:.05em;color:var(--muted);background:none;border:1px solid var(--hair);border-radius:7px;padding:5px 9px;cursor:pointer}
+  .mvtab.active{color:var(--obsidian);background:var(--brass);border-color:var(--brass);font-weight:700}
+  .mvsec{margin-top:16px}
+  .mvh{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+  .mvh.up{color:var(--gain)} .mvh.down{color:var(--loss)}
+  .mvrow{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--hair-2);cursor:pointer}
+  .mvrow:last-child{border-bottom:0}
+  .mvrow:hover{background:rgba(232,184,75,.06)}
+  .mvrank{font-family:'JetBrains Mono';font-size:11px;color:var(--muted);width:13px;flex:0 0 auto}
+  .mvname{font-weight:600;font-size:13px;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mvtk{font-family:'JetBrains Mono';font-size:10px;color:var(--brass);flex:0 0 auto}
+  .mvpct{font-family:'JetBrains Mono';font-weight:700;font-size:12.5px;width:60px;text-align:right;flex:0 0 auto}
+  .mvpct.up{color:var(--gain)} .mvpct.down{color:var(--loss)}
+  .mvempty{color:var(--muted);font-size:12px;padding:6px 0}
+  .mvnote{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.04em;color:var(--muted);margin-top:16px;line-height:1.55;border-top:1px solid var(--hair-2);padding-top:12px}
 </style>
 
+<div class="shell">
+  <aside class="movers panel" id="movers">
+    <div class="ph">Top Movers</div>
+    <div class="mvtabs">
+      <button class="mvtab active" data-p="Day">Day</button>
+      <button class="mvtab" data-p="WTD">WTD</button>
+      <button class="mvtab" data-p="MTD">MTD</button>
+      <button class="mvtab" data-p="YTD">YTD</button>
+    </div>
+    <div class="mvsec"><div class="mvh up">▲ Top Gainers</div><div id="gainers"></div></div>
+    <div class="mvsec"><div class="mvh down">▼ Top Losers</div><div id="losers"></div></div>
+    <div class="mvnote" id="mvnote"></div>
+  </aside>
 <div class="wrap">
   <div class="bar">
     <div class="logo"><svg viewBox="0 0 100 100" width="26" height="26" aria-label="CommaWatch"><circle cx="52" cy="43" r="23" fill="#E8B84B"/><path d="M37 58 Q31 80 41 88 Q44 90 47 86 Q57 72 62 55 Z" fill="#E8B84B"/></svg></div>
@@ -124,6 +159,7 @@
     it move. Private holdings (Blue Origin, the Clippers, real estate) are <b>labeled estimates from public records</b>,
     not live. Share counts and private valuations still need final confirmation before publishing.
   </div>
+</div>
 </div>
 
 <script>
@@ -501,9 +537,66 @@
   document.addEventListener("click",function(e){if(!e.target.closest(".search"))$("#results").classList.remove("show");});
   $("#simtoggle").addEventListener("click",function(){forceLive=!forceLive;this.classList.toggle("on",forceLive);if(selected)render();else renderMarket();});
 
+  // ---------- Top Movers ----------
+  var moversPeriod="Day", MARKET={}, moversReal=false;
+  var PERIODKEY={Day:"day",WTD:"wtd",MTD:"mtd",YTD:"ytd"};
+  var PERIODLBL={Day:"vs prev close",WTD:"vs week start",MTD:"vs month start",YTD:"vs year start"};
+
+  function allTickers(){var set={};ROSTER.forEach(function(p){liveH(p).forEach(function(h){set[h.ticker]=1;});});return Object.keys(set);}
+  // stable pseudo-random in [0,1) from a string — keeps demo rankings steady within a period
+  function hash01(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return ((h>>>0)%100000)/100000;}
+  function demoPct(sym,pk){var amp={day:0.02,wtd:0.05,mtd:0.09,ytd:0.28}[pk]||0.02;return (hash01(sym+"|"+pk)-0.5)*2*amp;}
+  function seedDemoMarket(pk){MARKET={};allTickers().forEach(function(t){var price=PRICES[t]!=null?PRICES[t]:100;MARKET[t]={price:price,base:price/(1+demoPct(t,pk))};});moversReal=false;}
+  function nwWith(p,fn){var s=staticTotal(p);liveH(p).forEach(function(h){s+=holdVal(h,fn(h.ticker));});return s;}
+  function mPrice(t){return MARKET[t]?MARKET[t].price:(PRICES[t]||0);}
+  function mBase(t){return MARKET[t]?MARKET[t].base:(PRICES[t]||0);}
+  function personPct(p){var cur=nwWith(p,mPrice),base=nwWith(p,mBase);return base?((cur-base)/base*100):0;}
+
+  function moverRows(list,cls){
+    return list.map(function(x,i){var p=x.p,prim=liveH(p)[0].ticker,sign=x.pct>=0?"+":"−";
+      return '<div class="mvrow" data-id="'+p.id+'"><span class="mvrank">'+(i+1)+'</span><span class="mvname">'+p.name+'</span><span class="mvtk">'+prim+'</span><span class="mvpct '+cls+'">'+sign+Math.abs(x.pct).toFixed(2)+'%</span></div>';
+    }).join("");
+  }
+  function renderMovers(){
+    var ranked=ROSTER.map(function(p){return {p:p,pct:personPct(p)};});
+    var gainers=ranked.filter(function(x){return x.pct>=0;}).sort(function(a,b){return b.pct-a.pct;}).slice(0,5);
+    var losers=ranked.filter(function(x){return x.pct<0;}).sort(function(a,b){return a.pct-b.pct;}).slice(0,5);
+    var g=$("#gainers"),l=$("#losers");
+    if(g)g.innerHTML=moverRows(gainers,"up")||'<div class="mvempty">No gainers</div>';
+    if(l)l.innerHTML=moverRows(losers,"down")||'<div class="mvempty">No losers</div>';
+    var note=$("#mvnote");
+    if(note)note.textContent=(moversReal?"Live ranking · ":"Demo ranking · ")+PERIODLBL[moversPeriod]+". Ranked by net-worth change; private holdings are estimates.";
+    bindMoverRows();
+  }
+  function bindMoverRows(){var rows=document.querySelectorAll(".mvrow");for(var i=0;i<rows.length;i++)rows[i].addEventListener("click",function(){select(this.getAttribute("data-id"));});}
+
+  async function pullMovers(){
+    var pk=PERIODKEY[moversPeriod], syms=allTickers();
+    try{
+      var res=await fetch('/api/quotes?symbols='+encodeURIComponent(syms.join(','))+'&period='+pk);
+      if(!res.ok)throw 0;
+      var data=await res.json(), any=false, m={};
+      syms.forEach(function(t){var qd=data[t];if(qd&&qd.c){var base=pk==="day"?(qd.pc||qd.c):(qd.ref||qd.pc||qd.c);m[t]={price:qd.c,base:base};any=true;}});
+      if(!any)throw 0;
+      MARKET=m;moversReal=true;renderMovers();
+    }catch(e){ if(!moversReal)seedDemoMarket(pk); renderMovers(); }
+  }
+  function setMoversPeriod(lbl){
+    moversPeriod=lbl;
+    var tabs=document.querySelectorAll(".mvtab");
+    for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle("active",tabs[i].getAttribute("data-p")===lbl);
+    if(!moversReal)seedDemoMarket(PERIODKEY[lbl]);   // instant demo response offline
+    renderMovers();
+    pullMovers();                                    // refresh real baseline for the new period
+  }
+  function bindMoversTabs(){var tabs=document.querySelectorAll(".mvtab");for(var i=0;i<tabs.length;i++)tabs[i].addEventListener("click",function(){setMoversPeriod(this.getAttribute("data-p"));});}
+  function initMovers(){bindMoversTabs();seedDemoMarket(PERIODKEY[moversPeriod]);renderMovers();pullMovers();}
+
   renderMarket();
   select("musk");           // load Musk by default — he's the live story right now
+  initMovers();
   setInterval(tick,1300);
   setInterval(pullReal,15000);   // refresh real prices every 15s
+  setInterval(pullMovers,15000); // refresh Top Movers rankings every 15s
 })();
 </script>
